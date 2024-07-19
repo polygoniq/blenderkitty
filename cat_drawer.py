@@ -47,7 +47,7 @@ CAT_NAMES = [
     "Lord Loaf",
     "Whiskers",
     "Minty",
-    "Mr. Paddington"
+    "Mr. Paddington",
 ]
 
 
@@ -140,7 +140,7 @@ class Cat:
         anim_folder: str,
         sound_file: typing.Optional[str] = None,
         duration: float = 5.0,
-        frame_duration: float = 0.1
+        frame_duration: float = 0.1,
     ):
         self.player = PNGSequencePlayer(anim_folder, frame_duration)
         self.sound_file = sound_file
@@ -179,7 +179,7 @@ class HappyCat(Cat):
             os.path.join(os.path.dirname(__file__), "cats_anim", "happy"),
             sound_file=None,
             duration=random.randint(5, 10),
-            frame_duration=0.08
+            frame_duration=0.08,
         )
         self.offset = mathutils.Vector((random.uniform(-20.0, 20.0), random.uniform(-20.0, 20.0)))
 
@@ -189,10 +189,12 @@ class HappyCat(Cat):
         if event is None or event.type != 'MOUSEMOVE':
             return
 
-        self.position = self.offset + mathutils.Vector((
-            event.mouse_x - self.player.texture_width / 2.0,
-            event.mouse_y - self.player.texture_height / 2.0
-        ))
+        self.position = self.offset + mathutils.Vector(
+            (
+                event.mouse_x - self.player.texture_width / 2.0,
+                event.mouse_y - self.player.texture_height / 2.0,
+            )
+        )
 
         self._clamp_position()
 
@@ -203,7 +205,7 @@ class SpinningCat(Cat):
             os.path.join(os.path.dirname(__file__), "cats_anim", "spinning"),
             sound_file=None,
             duration=random.uniform(10.0, 30.0),
-            frame_duration=0.04
+            frame_duration=0.04,
         )
         # speed / tick_rate = pixels per second
         # tick_rate = 10 ticks per s
@@ -212,15 +214,16 @@ class SpinningCat(Cat):
     def play(self, context: bpy.types.Context):
         super().play(context)
         size = GLOBAL_TICK_CONTEXT.view_3d_size
-        self.position = mathutils.Vector((
-            random.randint(0, int(size.x - self.player.texture_width)),
-            random.randint(0, int(size.y - self.player.texture_height))
-        ))
+        self.position = mathutils.Vector(
+            (
+                random.randint(0, int(size.x - self.player.texture_width)),
+                random.randint(0, int(size.y - self.player.texture_height)),
+            )
+        )
 
-        self.velocity = mathutils.Vector((
-            1 if random.random() > 0.5 else -1,
-            1 if random.random() > 0.5 else -1
-        ))
+        self.velocity = mathutils.Vector(
+            (1 if random.random() > 0.5 else -1, 1 if random.random() > 0.5 else -1)
+        )
         self._clamp_position()
 
     def tick(self, delta: float) -> None:
@@ -246,7 +249,7 @@ class DancingCat(Cat):
             os.path.join(os.path.dirname(__file__), "cats_anim", "dancing"),
             sound_file=None,
             duration=random.uniform(10.0, 30.0),
-            frame_duration=1
+            frame_duration=1,
         )
         # speed / tick_rate = pixels per second
         # tick_rate = 10 ticks per s
@@ -259,8 +262,9 @@ class DancingCat(Cat):
     def play(self, context: bpy.types.Context):
         super().play(context)
         size = GLOBAL_TICK_CONTEXT.view_3d_size
-        self.position = mathutils.Vector((
-            random.randint(0, int(size.x - self.player.texture_width)), 0))
+        self.position = mathutils.Vector(
+            (random.randint(0, int(size.x - self.player.texture_width)), 0)
+        )
 
         self.velocity = mathutils.Vector((1 if random.random() > 0.5 else -1, 0))
         self._clamp_position()
@@ -284,14 +288,15 @@ class PopCat(Cat):
             os.path.join(os.path.dirname(__file__), "cats_anim", "popcat"),
             sound_file=None,
             duration=random.uniform(10.0, 30.0),
-            frame_duration=5
+            frame_duration=5,
         )
 
     def play(self, context: bpy.types.Context):
         super().play(context)
         size = GLOBAL_TICK_CONTEXT.view_3d_size
-        self.position = mathutils.Vector((
-            random.randint(0, int(size.x - self.player.texture_width)), 0))
+        self.position = mathutils.Vector(
+            (random.randint(0, int(size.x - self.player.texture_width)), 0)
+        )
 
 
 class GooglyCat(Cat):
@@ -300,14 +305,15 @@ class GooglyCat(Cat):
             os.path.join(os.path.dirname(__file__), "cats_anim", "googly"),
             sound_file=None,
             duration=random.uniform(5.0, 15.0),
-            frame_duration=0.2
+            frame_duration=0.2,
         )
 
     def play(self, context: bpy.types.Context):
         super().play(context)
         size = GLOBAL_TICK_CONTEXT.view_3d_size
-        self.position = mathutils.Vector((
-            random.randint(0, int(size.x - self.player.texture_width)), -50))
+        self.position = mathutils.Vector(
+            (random.randint(0, int(size.x - self.player.texture_width)), -50)
+        )
 
 
 class HangingCat(Cat):
@@ -316,16 +322,18 @@ class HangingCat(Cat):
             os.path.join(os.path.dirname(__file__), "cats_anim", "hanging"),
             sound_file=None,
             duration=random.uniform(5.0, 15.0),
-            frame_duration=0.2
+            frame_duration=0.2,
         )
 
     def play(self, context: bpy.types.Context):
         super().play(context)
         size = GLOBAL_TICK_CONTEXT.view_3d_size
-        self.position = mathutils.Vector((
-            random.randint(0, int(size.x - self.player.texture_width)),
-            size.y - self.player.texture_height + random.randint(10, 40)
-        ))
+        self.position = mathutils.Vector(
+            (
+                random.randint(0, int(size.x - self.player.texture_width)),
+                size.y - self.player.texture_height + random.randint(10, 40),
+            )
+        )
 
 
 class DrawerFullOfCats:
@@ -339,8 +347,9 @@ class DrawerFullOfCats:
         cat = self.available_cats[random.randint(0, len(self.available_cats) - 1)]()
         cat.play(context)
         self.cats.append(cat)
-        bpy.app.timers.register(lambda: self.close(
-            cat), persistent=True, first_interval=cat.duration)
+        bpy.app.timers.register(
+            lambda: self.close(cat), persistent=True, first_interval=cat.duration
+        )
         return cat
 
     def close(self, cat: Cat):
@@ -353,8 +362,7 @@ class DrawerFullOfCats:
 
         for cat in self.cats:
             texture = cat.player.get_current_texture()
-            gpu_extras.presets.draw_texture_2d(
-                texture, cat.position, texture.width, texture.height)
+            gpu_extras.presets.draw_texture_2d(texture, cat.position, texture.width, texture.height)
 
         gpu.state.blend_set(blend)
 
@@ -432,14 +440,18 @@ class OpenCatDrawer(bpy.types.Operator):
         prefs = preferences.get_preferences(context)
         prefs.play_sound(os.path.join(prefs.sounds_path, "drawer.ogg"), stop_after=opening_time)
 
-        bpy.app.timers.register(lambda: OpenCatDrawer.open(
-            context, self.index), first_interval=opening_time)
-        bpy.app.timers.register(lambda: OpenCatDrawer.add_dot(
-            self.index), first_interval=opening_time * 0.2)
-        bpy.app.timers.register(lambda: OpenCatDrawer.add_dot(
-            self.index), first_interval=opening_time * 0.4)
-        bpy.app.timers.register(lambda: OpenCatDrawer.add_dot(
-            self.index), first_interval=opening_time * 0.8)
+        bpy.app.timers.register(
+            lambda: OpenCatDrawer.open(context, self.index), first_interval=opening_time
+        )
+        bpy.app.timers.register(
+            lambda: OpenCatDrawer.add_dot(self.index), first_interval=opening_time * 0.2
+        )
+        bpy.app.timers.register(
+            lambda: OpenCatDrawer.add_dot(self.index), first_interval=opening_time * 0.4
+        )
+        bpy.app.timers.register(
+            lambda: OpenCatDrawer.add_dot(self.index), first_interval=opening_time * 0.8
+        )
         return {'FINISHED'}
 
     def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
@@ -463,7 +475,8 @@ def register():
 
     global _DRAW_HANDLER
     _DRAW_HANDLER = bpy.types.SpaceView3D.draw_handler_add(
-        CAT_DRAWER.draw, (), 'WINDOW', 'POST_PIXEL')
+        CAT_DRAWER.draw, (), 'WINDOW', 'POST_PIXEL'
+    )
 
     # Start the update_global_tick_context, right after registering blenderkitty
     bpy.app.timers.register(_start_gathering_events, first_interval=0.5, persistent=True)

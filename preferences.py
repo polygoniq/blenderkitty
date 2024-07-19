@@ -1,5 +1,6 @@
 # copyright (c) 2018- polygoniq xyz s.r.o.
 
+from . import addon_updater
 from . import addon_updater_ops
 import bpy
 import bpy.utils.previews
@@ -10,7 +11,8 @@ import random
 import functools
 import typing
 import logging
-import polib
+from . import polib
+
 logger = logging.getLogger(f"polygoniq.{__name__}")
 
 telemetry = polib.get_telemetry("blenderkitty")
@@ -37,7 +39,7 @@ CAT_TEXTS: typing.Mapping[int, str] = {
     13: "What seems to be\nthe officer, problem?",
     14: "Working on the\nproject for 10h be like:",
     15: "Just scale the parent,\nI swear it works!",
-    16: "Extrude along normal."
+    16: "Extrude along normal.",
 }
 
 
@@ -76,8 +78,7 @@ def get_cat_enum_items(image_path):
         else:
             image = ret["pcoll"].load(image_name, full_path, 'IMAGE')
 
-        ret["enum_items"].append((image_name, f"{i}",
-                                  image_name, image.icon_id, i))
+        ret["enum_items"].append((image_name, f"{i}", image_name, image.icon_id, i))
 
     return ret
 
@@ -85,6 +86,25 @@ def get_cat_enum_items(image_path):
 def get_cat_enum_items_context(context):
     prefs = get_preferences(context)
     return get_cat_enum_items(prefs.cats_path)
+
+
+class ShowReleaseNotes(bpy.types.Operator):
+    bl_idname = "blenderkitty.show_release_notes"
+    bl_label = "Show Release Notes"
+    bl_description = "Show the release notes for the latest version of blenderkitty"
+    bl_options = {'REGISTER'}
+
+    release_tag: bpy.props.StringProperty(
+        name="Release Tag",
+        default="",
+    )
+
+    def execute(self, context: bpy.types.Context):
+        polib.ui_bpy.show_release_notes_popup(context, __package__, self.release_tag)
+        return {'FINISHED'}
+
+
+MODULE_CLASSES.append(ShowReleaseNotes)
 
 
 @polib.log_helpers_bpy.logged_preferences
@@ -96,14 +116,11 @@ class Preferences(bpy.types.AddonPreferences):
     auto_check_update: bpy.props.BoolProperty(
         name="Auto-check for Update",
         description="If enabled, auto-check for updates using an interval",
-        default=True
+        default=True,
     )
 
     updater_interval_months: bpy.props.IntProperty(
-        name='Months',
-        description="Number of months between checking for updates",
-        default=0,
-        min=0
+        name='Months', description="Number of months between checking for updates", default=0, min=0
     )
 
     updater_interval_days: bpy.props.IntProperty(
@@ -111,7 +128,7 @@ class Preferences(bpy.types.AddonPreferences):
         description="Number of days between checking for updates",
         default=7,
         min=0,
-        max=31
+        max=31,
     )
 
     updater_interval_hours: bpy.props.IntProperty(
@@ -119,7 +136,7 @@ class Preferences(bpy.types.AddonPreferences):
         description="Number of hours between checking for updates",
         default=0,
         min=0,
-        max=23
+        max=23,
     )
 
     updater_interval_minutes: bpy.props.IntProperty(
@@ -127,7 +144,7 @@ class Preferences(bpy.types.AddonPreferences):
         description="Number of minutes between checking for updates",
         default=0,
         min=0,
-        max=59
+        max=59,
     )
 
     blenderkitty_path: bpy.props.StringProperty(
@@ -135,24 +152,24 @@ class Preferences(bpy.types.AddonPreferences):
         subtype="DIR_PATH",
         default=autodetect_install_path(),
         update=lambda self, context: polib.utils_bpy.absolutize_preferences_path(
-            self, context, "blenderkitty_path")
+            self, context, "blenderkitty_path"
+        ),
     )
 
     cat: bpy.props.EnumProperty(
-        name="Cat",
-        items=lambda self, context: get_cat_enum_items_context(context)["enum_items"]
+        name="Cat", items=lambda self, context: get_cat_enum_items_context(context)["enum_items"]
     )
 
     settings_expanded: bpy.props.BoolProperty(
         name="Settings Expanded",
         default=False,
-        description="Whether settings are expanded in the main panel"
+        description="Whether settings are expanded in the main panel",
     )
 
     sounds_enabled: bpy.props.BoolProperty(
         name="Sounds Enabled",
         default=True,
-        description="Play a random cute cat sound every time the cat image changes"
+        description="Play a random cute cat sound every time the cat image changes",
     )
 
     sound_volume: bpy.props.FloatProperty(
@@ -160,21 +177,21 @@ class Preferences(bpy.types.AddonPreferences):
         default=0.3,
         min=0.0,
         max=1.0,
-        description="How loud the cat sounds should be if enabled"
+        description="How loud the cat sounds should be if enabled",
     )
 
     min_refresh_interval: bpy.props.FloatProperty(
         name="Min interval for refresh [s]",
         default=10.0,
         min=0.0,
-        description="Minimal interval in seconds between cat image changes"
+        description="Minimal interval in seconds between cat image changes",
     )
 
     max_refresh_interval: bpy.props.FloatProperty(
         name="Max interval for refresh [s]",
         default=30.0,
         min=0.0,
-        description="Maximal interval in seconds between cat image changes"
+        description="Maximal interval in seconds between cat image changes",
     )
 
     sound_device: typing.Optional[aud.Device] = None
@@ -184,7 +201,7 @@ class Preferences(bpy.types.AddonPreferences):
         sound_path: str,
         distance: float = 20.0,
         vec: typing.Tuple[float, float, float] = (1.0, 0.0, 0.0),
-        stop_after: typing.Optional[float] = None
+        stop_after: typing.Optional[float] = None,
     ) -> None:
         if not self.sounds_enabled:
             logger.debug("Sounds are disabled, but requested to play sound!")
@@ -202,17 +219,16 @@ class Preferences(bpy.types.AddonPreferences):
             # the number of loops remaining must be 0 to avoid looping at all
             Preferences.sound_handle.loop_count = 0
             Preferences.sound_handle.volume = self.sound_volume
-            mag = sum(x ** 2 for x in vec) ** .5
+            mag = sum(x**2 for x in vec) ** 0.5
             direction = [x / mag for x in vec]
-            Preferences.sound_handle.location = mathutils.Vector((
-                direction[0] * distance,
-                direction[1] * distance,
-                direction[2] * distance
-            ))
+            Preferences.sound_handle.location = mathutils.Vector(
+                (direction[0] * distance, direction[1] * distance, direction[2] * distance)
+            )
 
             if stop_after is not None:
                 bpy.app.timers.register(
-                    Preferences.sound_handle.stop, first_interval=stop_after, persistent=False)
+                    Preferences.sound_handle.stop, first_interval=stop_after, persistent=False
+                )
 
         except aud.error:
             # this could fail if no sound device is available
@@ -221,7 +237,8 @@ class Preferences(bpy.types.AddonPreferences):
     def play_random_sound(self, context: bpy.types.Context):
         if not os.path.isdir(self.random_sounds_path):
             logger.error(
-                f"Sound directory {self.random_sounds_path} was not found or is not a directory!")
+                f"Sound directory {self.random_sounds_path} was not found or is not a directory!"
+            )
             return
 
         sounds = [x for x in os.listdir(self.random_sounds_path) if x.endswith(".ogg")]
@@ -233,7 +250,7 @@ class Preferences(bpy.types.AddonPreferences):
         self.play_sound(
             sound_path,
             random.uniform(30.0, 100.0),
-            (random.gauss(0.0, 1.0), random.gauss(0.0, 1.0), random.gauss(0.0, 1.0))
+            (random.gauss(0.0, 1.0), random.gauss(0.0, 1.0), random.gauss(0.0, 1.0)),
         )
 
     def ensure_valid_enum_items(self, context):
@@ -267,9 +284,28 @@ class Preferences(bpy.types.AddonPreferences):
         self.layout.separator()
         row = self.layout.row()
         col = row.column()
-        addon_updater_ops.update_settings_ui(self, context, col)
+
+        if bpy.app.version < (4, 2, 0) or (bpy.app.version >= (4, 2, 0) and bpy.app.online_access):
+            self.draw_update_settings(context, col)
 
         polib.ui_bpy.draw_settings_footer(self.layout)
+
+    def draw_update_settings(self, context: bpy.types.Context, layout: bpy.types.UILayout) -> None:
+        col = layout.column()
+        addon_updater_ops.update_settings_ui(self, context, col)
+        split = col.split(factor=0.5)
+        left_row = split.row()
+        left_row.enabled = bool(addon_updater.Updater.update_ready)
+        left_row.operator(
+            ShowReleaseNotes.bl_idname, text="Latest Release Notes", icon='PRESET_NEW'
+        ).release_tag = ""
+        right_row = split.row()
+        current_release_tag = polib.utils_bpy.get_release_tag_from_version(
+            addon_updater.Updater.current_version
+        )
+        right_row.operator(
+            ShowReleaseNotes.bl_idname, text="Current Release Notes", icon='PRESET'
+        ).release_tag = current_release_tag
 
     @property
     def install_path(self) -> str:

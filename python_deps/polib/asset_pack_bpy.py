@@ -3,12 +3,11 @@
 
 import bpy
 import bpy.utils.previews
-import os
-import os.path
 import typing
 import collections
 import enum
 import logging
+
 try:
     import hatchery
 except ImportError:
@@ -22,6 +21,7 @@ if "linalg_bpy" not in locals():
     from . import rigs_shared_bpy
 else:
     import importlib
+
     linalg_bpy = importlib.reload(linalg_bpy)
     utils_bpy = importlib.reload(utils_bpy)
     rigs_shared_bpy = importlib.reload(rigs_shared_bpy)
@@ -56,7 +56,10 @@ BOTANIQ_SEASONS = {"spring", "summer", "autumn", "winter"}
 # order matters, assets often have multiple seasons, color is set according to the first
 # matched season
 BOTANIQ_SEASONS_WITH_COLOR_CHANNEL = (
-    ("summer", 1.0), ("spring", 0.75), ("winter", 0.5), ("autumn", 0.25)
+    ("summer", 1.0),
+    ("spring", 0.75),
+    ("winter", 0.5),
+    ("autumn", 0.25),
 )
 
 BOTANIQ_ANIMATED_CATEGORIES = {
@@ -70,7 +73,7 @@ BOTANIQ_ANIMATED_CATEGORIES = {
     "sapling",
     "tropical",
     "vine",
-    "weed"
+    "weed",
 }
 
 
@@ -91,8 +94,7 @@ class CustomPropertyNames:
 
 
 def get_all_object_ancestors(obj: bpy.types.Object) -> typing.Iterable[bpy.types.Object]:
-    """Returns given object's parent, the parent's parent, ...
-    """
+    """Returns given object's parent, the parent's parent, ..."""
 
     current = obj.parent
     while current is not None:
@@ -101,7 +103,7 @@ def get_all_object_ancestors(obj: bpy.types.Object) -> typing.Iterable[bpy.types
 
 
 def filter_out_descendants_from_objects(
-    objects: typing.Iterable[bpy.types.Object]
+    objects: typing.Iterable[bpy.types.Object],
 ) -> typing.Set[bpy.types.Object]:
     """Given a list of objects (i.e. selected objects) this function will return only the
     roots. By roots we mean included objects that have no ancestor that is also contained
@@ -128,7 +130,7 @@ def is_polygoniq_object(
     obj: bpy.types.Object,
     addon_name_filter: typing.Optional[typing.Callable[[str], bool]] = None,
     include_editable: bool = True,
-    include_linked: bool = True
+    include_linked: bool = True,
 ) -> bool:
     if include_editable and obj.instance_type == 'NONE' and obj.get("polygoniq_addon", None):
         # only non-'EMPTY' objects can be considered editable
@@ -147,8 +149,7 @@ def is_polygoniq_object(
 
 
 def find_polygoniq_root_objects(
-    objects: typing.Iterable[bpy.types.Object],
-    addon_name: typing.Optional[str] = None
+    objects: typing.Iterable[bpy.types.Object], addon_name: typing.Optional[str] = None
 ) -> typing.Set[bpy.types.Object]:
     """Finds and returns polygoniq root objects in 'objects'.
 
@@ -175,7 +176,9 @@ def find_polygoniq_root_objects(
                     root_objects.add(current_obj)
                 break
 
-            if is_polygoniq_object(current_obj, addon_name_filter) and not is_polygoniq_object(current_obj.parent, addon_name_filter):
+            if is_polygoniq_object(current_obj, addon_name_filter) and not is_polygoniq_object(
+                current_obj.parent, addon_name_filter
+            ):
                 root_objects.add(current_obj)
                 break
 
@@ -189,10 +192,9 @@ def get_polygoniq_objects(
     objects: typing.Iterable[bpy.types.Object],
     addon_name: typing.Optional[str] = None,
     include_editable: bool = True,
-    include_linked: bool = True
+    include_linked: bool = True,
 ) -> typing.Iterable[bpy.types.Object]:
-    """Filters given objects and returns only those that contain the polygoniq_addon property
-    """
+    """Filters given objects and returns only those that contain the polygoniq_addon property"""
     addon_name_filter = None if addon_name is None else lambda x: x == addon_name
     for obj in objects:
         if is_polygoniq_object(obj, addon_name_filter, include_editable, include_linked):
@@ -239,8 +241,13 @@ def is_traffiq_asset_part(obj: bpy.types.Object, part: TraffiqAssetPart) -> bool
     return False
 
 
-DecomposedCarType = typing.Tuple[bpy.types.Object, bpy.types.Object,
-                                 bpy.types.Object, typing.List[bpy.types.Object], typing.List[bpy.types.Object]]
+DecomposedCarType = typing.Tuple[
+    bpy.types.Object,
+    bpy.types.Object,
+    bpy.types.Object,
+    typing.List[bpy.types.Object],
+    typing.List[bpy.types.Object],
+]
 
 
 def get_root_object_of_asset(asset: bpy.types.Object) -> typing.Optional[bpy.types.Object]:
@@ -325,20 +332,14 @@ def decompose_traffiq_vehicle(obj: bpy.types.Object) -> DecomposedCarType:
     return root_object, body, lights, wheels, brakes
 
 
-def find_traffiq_asset_parts(obj: bpy.types.Object, part: TraffiqAssetPart) -> typing.Iterable[bpy.types.Object]:
+def find_traffiq_asset_parts(
+    obj: bpy.types.Object, part: TraffiqAssetPart
+) -> typing.Iterable[bpy.types.Object]:
     """Find all asset parts of a specific type."""
 
     for hierarchy_obj in get_entire_object_hierarchy(obj):
         if is_traffiq_asset_part(hierarchy_obj, part):
             yield hierarchy_obj
-
-
-def find_traffiq_lights_container(obj: bpy.types.Object) -> typing.Optional[bpy.types.Object]:
-    """Finds whatever contains all the lights of given objects. This can be a empty with instance
-    collection if the car is linked or an lights object if the car has been converted to editable.
-    """
-    return find_object_in_hierarchy(
-        obj, lambda x, _: x.get(CustomPropertyNames.TQ_LIGHTS, None) is not None)
 
 
 def is_pps(name: str) -> bool:
@@ -349,120 +350,12 @@ def is_pps(name: str) -> bool:
     return split[1] == PARTICLE_SYSTEM_TOKEN
 
 
-def make_selection_linked(
+def make_selection_editable(
     context: bpy.types.Context,
-    install_paths_by_features: typing.Dict[str, typing.List[str]]
-) -> typing.List[bpy.types.Object]:
-    previous_selection = [obj.name for obj in context.selected_objects]
-    previous_active_object_name = context.active_object.name if context.active_object else None
-
-    converted_objects = []
-    for obj in find_polygoniq_root_objects(context.selected_objects):
-        if obj.instance_type == 'COLLECTION':
-            continue
-
-        path_property = obj.get("polygoniq_addon_blend_path", None)
-        if path_property is None:
-            continue
-
-        # Particle systems are skipped. After converting to editable
-        # all instances of particle system are separate objects. It
-        # is not easy to decide which object belonged to what preset.
-        if path_property.startswith("blends/particles"):
-            continue
-
-        # Asset Addons are now Asset Packs
-        # "polygoniq_addon" refers to the Asset Pack's engon feature
-        # TODO: Rework this after mapr_ids get merged
-        feature_property = obj.get("polygoniq_addon", None)
-        if feature_property is None:
-            continue
-
-        install_paths_by_feature = install_paths_by_features.get(feature_property, None)
-        if install_paths_by_feature is None:
-            logger.warning(
-                f"Obj {obj.name} contains property: {feature_property} but the Asset Pack is not installed!")
-            continue
-
-        asset_path: str = ""
-        asset_paths_list: typing.List[str] = []
-        for install_path in install_paths_by_feature:
-            asset_path = os.path.join(install_path, os.path.normpath(path_property))
-            asset_paths_list.append(f"'{asset_path}'")
-            if not os.path.isfile(asset_path):
-                logger.info(
-                    f"Could not find {obj.name} in {asset_path} because "
-                    f"it doesn't exist, perhaps the asset isn't in this version anymore.")
-                continue
-            if os.path.isfile(asset_path):
-                logger.info(f"Found {obj.name} in {asset_path}. Proceeding to linking.")
-                break
-        if not os.path.isfile(asset_path):
-            asset_paths_str = ", ".join(asset_paths_list)
-            logger.warning(
-                f"Cannot link {obj.name} from any of the paths: {asset_paths_str}, because "
-                f"it doesn't exist.")
-            continue
-
-        instance_root = None
-        old_model_matrix = obj.matrix_world.copy()
-        old_collections = list(obj.users_collection)
-        old_color = tuple(obj.color)
-        old_parent = obj.parent
-
-        # This way old object names won't interfere with the new ones
-        hierarchy_objects = get_hierarchy(obj)
-        for hierarchy_obj in hierarchy_objects:
-            hierarchy_obj.name = utils_bpy.generate_unique_name(
-                f"del_{hierarchy_obj.name}", bpy.data.objects)
-
-        model_data = hatchery.spawn.spawn_model(
-            asset_path,
-            context,
-            hatchery.spawn.ModelSpawnOptions(
-                parent_collection=None,
-                select_spawned=False
-            )
-        )
-        instance_root = model_data.instancer
-        if instance_root is not None:
-            instance_root.color = old_color
-
-        if instance_root is None:
-            logger.error(f"Failed to link asset {obj} with "
-                         f"{feature_property}, instance is None")
-            continue
-
-        instance_root.matrix_world = old_model_matrix
-        instance_root.parent = old_parent
-
-        for coll in old_collections:
-            if instance_root.name not in coll.objects:
-                coll.objects.link(instance_root)
-
-        converted_objects.append(instance_root)
-
-        bpy.data.batch_remove(hierarchy_objects)
-
-    # Force Blender to evaluate view_layer data after programmatically removing/linking objects.
-    # https://docs.blender.org/api/current/info_gotcha.html#no-updates-after-setting-values
-    context.view_layer.update()
-
-    for obj_name in previous_selection:
-        obj = context.view_layer.objects.get(obj_name, None)
-        # Linked version doesn't necessary contain the same objects
-        # e. g. traffiq linked version doesn't contain wheels, brakes, ...
-        if obj is not None:
-            obj.select_set(True)
-
-    if previous_active_object_name is not None and \
-       previous_active_object_name in context.view_layer.objects:
-        context.view_layer.objects.active = bpy.data.objects[previous_active_object_name]
-
-    return converted_objects
-
-
-def make_selection_editable(context: bpy.types.Context, delete_base_empty: bool, keep_selection: bool = True, keep_active: bool = True) -> typing.List[str]:
+    delete_base_empty: bool,
+    keep_selection: bool = True,
+    keep_active: bool = True,
+) -> typing.List[str]:
     def apply_botaniq_particle_system_modifiers(obj: bpy.types.Object):
         for child in obj.children:
             apply_botaniq_particle_system_modifiers(child)
@@ -486,17 +379,24 @@ def make_selection_editable(context: bpy.types.Context, delete_base_empty: bool,
 
             obj.modifiers.remove(modifier)
 
-    InstancedObjectInfo = typing.Tuple[bpy.types.Object, bpy.types.Collection,
-                                       str, typing.Tuple[float, float, float, float]]
+    InstancedObjectInfo = typing.Tuple[
+        bpy.types.Object, bpy.types.Collection, str, typing.Tuple[float, float, float, float]
+    ]
 
-    def find_instanced_collection_objects(obj: bpy.types.Object, instanced_collection_objects: typing.Dict[str, InstancedObjectInfo]):
+    def find_instanced_collection_objects(
+        obj: bpy.types.Object, instanced_collection_objects: typing.Dict[str, InstancedObjectInfo]
+    ):
         for child in obj.children:
             find_instanced_collection_objects(child, instanced_collection_objects)
 
         if obj.instance_type == 'COLLECTION':
             if obj.name not in instanced_collection_objects:
                 instanced_collection_objects[obj.name] = (
-                    obj, obj.instance_collection, obj.parent.name if obj.parent else None, obj.color)
+                    obj,
+                    obj.instance_collection,
+                    obj.parent.name if obj.parent else None,
+                    obj.color,
+                )
 
     def copy_polygoniq_custom_props_from_children(obj: bpy.types.Object) -> None:
         """Tries to copy Polygoniq custom properties from children to 'obj'.
@@ -520,7 +420,9 @@ def make_selection_editable(context: bpy.types.Context, delete_base_empty: bool,
                     obj["mapr_asset_data_id"] = mapr_data_id
                 return
 
-    def get_mesh_to_objects_map(obj: bpy.types.Object, result: typing.DefaultDict[str, typing.List[bpy.types.ID]]) -> None:
+    def get_mesh_to_objects_map(
+        obj: bpy.types.Object, result: typing.DefaultDict[str, typing.List[bpy.types.ID]]
+    ) -> None:
         for child in obj.children:
             get_mesh_to_objects_map(child, result)
 
@@ -528,7 +430,9 @@ def make_selection_editable(context: bpy.types.Context, delete_base_empty: bool,
             original_mesh_name = utils_bpy.remove_object_duplicate_suffix(obj.data.name)
             result[original_mesh_name].append(obj)
 
-    def get_material_to_slots_map(obj: bpy.types.Object, result: typing.DefaultDict[str, typing.List[bpy.types.ID]]) -> None:
+    def get_material_to_slots_map(
+        obj: bpy.types.Object, result: typing.DefaultDict[str, typing.List[bpy.types.ID]]
+    ) -> None:
         for child in obj.children:
             get_material_to_slots_map(child, result)
 
@@ -538,10 +442,13 @@ def make_selection_editable(context: bpy.types.Context, delete_base_empty: bool,
                     continue
 
                 original_material_name = utils_bpy.remove_object_duplicate_suffix(
-                    material_slot.material.name)
+                    material_slot.material.name
+                )
                 result[original_material_name].append(material_slot)
 
-    def get_armatures_to_objects_map(obj: bpy.types.Object, result: typing.DefaultDict[str, typing.List[bpy.types.ID]]) -> None:
+    def get_armatures_to_objects_map(
+        obj: bpy.types.Object, result: typing.DefaultDict[str, typing.List[bpy.types.ID]]
+    ) -> None:
         for child in obj.children:
             get_armatures_to_objects_map(child, result)
 
@@ -549,12 +456,18 @@ def make_selection_editable(context: bpy.types.Context, delete_base_empty: bool,
             original_armature_name = utils_bpy.remove_object_duplicate_suffix(obj.data.name)
             result[original_armature_name].append(obj)
 
-    GetNameToUsersMapCallable = typing.Callable[[
-        bpy.types.Object, typing.DefaultDict[str, typing.List[bpy.types.ID]]], None]
+    GetNameToUsersMapCallable = typing.Callable[
+        [bpy.types.Object, typing.DefaultDict[str, typing.List[bpy.types.ID]]], None
+    ]
 
-    def make_datablocks_unique_per_object(obj: bpy.types.Object, get_data_to_struct_map: GetNameToUsersMapCallable, datablock_name: str):
-        datablocks_to_owner_structs: typing.DefaultDict[str, typing.List[bpy.types.ID]] = \
+    def make_datablocks_unique_per_object(
+        obj: bpy.types.Object,
+        get_data_to_struct_map: GetNameToUsersMapCallable,
+        datablock_name: str,
+    ):
+        datablocks_to_owner_structs: typing.DefaultDict[str, typing.List[bpy.types.ID]] = (
             collections.defaultdict(list)
+        )
         get_data_to_struct_map(obj, datablocks_to_owner_structs)
 
         for owner_structs in datablocks_to_owner_structs.values():
@@ -583,7 +496,8 @@ def make_selection_editable(context: bpy.types.Context, delete_base_empty: bool,
 
     # origin objects from particle systems were removed from scene
     selected_objects_names = [
-        obj_name for obj_name in selected_objects_names if obj_name in bpy.data.objects]
+        obj_name for obj_name in selected_objects_names if obj_name in bpy.data.objects
+    ]
 
     clear_selection(context)
     for instance_object, _, _, _ in instanced_collection_objects.values():
@@ -629,8 +543,10 @@ def make_selection_editable(context: bpy.types.Context, delete_base_empty: bool,
                 # after setting parent object here, child.parent_type is always set to 'OBJECT'
                 child.parent = parent
                 child_source_name = utils_bpy.remove_object_duplicate_suffix(child.name)
-                if child_source_name in instance_collection.objects and \
-                        instance_collection.objects[child_source_name].parent is not None:
+                if (
+                    child_source_name in instance_collection.objects
+                    and instance_collection.objects[child_source_name].parent is not None
+                ):
                     # set parent_type from source blend, for example our _Lights need to have parent_type = 'BONE'
                     child.parent_type = instance_collection.objects[child_source_name].parent_type
                     child.matrix_local = instance_collection.objects[child_source_name].matrix_local
@@ -694,8 +610,9 @@ def make_selection_editable(context: bpy.types.Context, delete_base_empty: bool,
     return selected_objects
 
 
-HierarchyNameComparator = typing.Callable[[
-    bpy.types.Object, typing.Optional[bpy.types.Object]], bool]
+HierarchyNameComparator = typing.Callable[
+    [bpy.types.Object, typing.Optional[bpy.types.Object]], bool
+]
 
 
 def find_object_in_hierarchy(
@@ -718,9 +635,18 @@ def find_object_in_hierarchy(
     return search_hierarchy(root_obj)
 
 
+def get_root_objects_with_matched_child(
+    objects: typing.Iterable[bpy.types.Object], comparator: HierarchyNameComparator
+) -> typing.Iterable[typing.Tuple[bpy.types.Object, bpy.types.Object]]:
+    """Searches hierarchies of objects and returns objects that satisfy the 'comparator', and their root objects"""
+    for root_obj in find_polygoniq_root_objects(objects):
+        searched_obj = find_object_in_hierarchy(root_obj, comparator)
+        if searched_obj is not None:
+            yield (root_obj, searched_obj)
+
+
 def get_hierarchy(root: bpy.types.ID) -> typing.List[bpy.types.ID]:
-    """Gathers children of 'root' recursively
-    """
+    """Gathers children of 'root' recursively"""
 
     assert hasattr(root, "children")
     ret = [root]
@@ -730,8 +656,9 @@ def get_hierarchy(root: bpy.types.ID) -> typing.List[bpy.types.ID]:
     return ret
 
 
-def collection_get(context: bpy.types.Context, name: str, parent:
-                   typing.Optional[bpy.types.Collection] = None) -> bpy.types.Collection:
+def collection_get(
+    context: bpy.types.Context, name: str, parent: typing.Optional[bpy.types.Collection] = None
+) -> bpy.types.Collection:
     scene_collections = get_hierarchy(context.scene.collection)
     for coll in scene_collections:
         if utils_bpy.remove_object_duplicate_suffix(coll.name) == name:
@@ -747,7 +674,9 @@ def collection_get(context: bpy.types.Context, name: str, parent:
         coll_color = ASSET_PACK_COLLECTION_COLOR_MAP.get(name, None)
         if coll_color is not None:
             coll.color_tag = coll_color
-        elif parent is not None:  # color direct descendants by their parent color - e.g. botaniq/weed
+        elif (
+            parent is not None
+        ):  # color direct descendants by their parent color - e.g. botaniq/weed
             parent_name = utils_bpy.remove_object_duplicate_suffix(parent.name)
             parent_color = ASSET_PACK_COLLECTION_COLOR_MAP.get(parent_name, None)
             if parent_color is not None:
@@ -756,8 +685,7 @@ def collection_get(context: bpy.types.Context, name: str, parent:
 
 
 def collection_add_object(collection: bpy.types.Collection, obj: bpy.types.Object) -> None:
-    """Unlinks 'obj' from all collections and links it into 'collection'
-    """
+    """Unlinks 'obj' from all collections and links it into 'collection'"""
 
     for coll in obj.users_collection:
         coll.objects.unlink(obj)
@@ -766,8 +694,7 @@ def collection_add_object(collection: bpy.types.Collection, obj: bpy.types.Objec
 
 
 def copy_object_hierarchy(root_obj: bpy.types.Object) -> bpy.types.Object:
-    """Copies 'root_obj' and its hierarchy while preserving parenting, returns the root copy
-    """
+    """Copies 'root_obj' and its hierarchy while preserving parenting, returns the root copy"""
 
     def copy_hierarchy(obj: bpy.types.Object, parent: bpy.types.Object) -> None:
         obj_copy = obj.copy()
@@ -783,8 +710,7 @@ def copy_object_hierarchy(root_obj: bpy.types.Object) -> bpy.types.Object:
 
 
 def collection_link_hierarchy(collection: bpy.types.Collection, root_obj: bpy.types.Object) -> None:
-    """Links 'root_obj' and its hierarachy to 'collection' and unlinks it from all other collections
-    """
+    """Links 'root_obj' and its hierarachy to 'collection' and unlinks it from all other collections"""
 
     for obj in get_hierarchy(root_obj):
         for coll in obj.users_collection:
@@ -792,17 +718,18 @@ def collection_link_hierarchy(collection: bpy.types.Collection, root_obj: bpy.ty
         collection.objects.link(obj)
 
 
-def collection_unlink_hierarchy(collection: bpy.types.Collection, root_obj: bpy.types.Object) -> None:
-    """Unlinks 'root_obj' and it's hierarchy from 'collection'
-    """
+def collection_unlink_hierarchy(
+    collection: bpy.types.Collection, root_obj: bpy.types.Object
+) -> None:
+    """Unlinks 'root_obj' and it's hierarchy from 'collection'"""
 
     for obj in get_hierarchy(root_obj):
         collection.objects.unlink(obj)
 
 
 def find_layer_collection(
-        view_layer_root: bpy.types.LayerCollection,
-        target: bpy.types.Collection) -> typing.Optional[bpy.types.LayerCollection]:
+    view_layer_root: bpy.types.LayerCollection, target: bpy.types.Collection
+) -> typing.Optional[bpy.types.LayerCollection]:
     """Finds corresponding LayerCollection from 'view_layer_coll' hierarchy
     which contains 'target' collection.
     """
@@ -824,9 +751,7 @@ def clear_selection(context: bpy.types.Context) -> None:
 
 
 def append_modifiers_from_library(
-    modifier_container_name: str,
-    library_path: str,
-    target_objs: typing.Iterable[bpy.types.Object]
+    modifier_container_name: str, library_path: str, target_objs: typing.Iterable[bpy.types.Object]
 ) -> None:
     """Add all modifiers from object with given name in given .blend library to 'target_objects'.
 
@@ -858,7 +783,7 @@ def update_custom_prop(
     objs: typing.Iterable[bpy.types.Object],
     prop_name: str,
     value: CustomAttributeValueType,
-    update_tag_refresh: typing.Set[str] = {'OBJECT'}
+    update_tag_refresh: typing.Set[str] = {'OBJECT'},
 ) -> None:
     """Update custom properties of given objects and force 3D view to redraw
 

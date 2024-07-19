@@ -28,11 +28,15 @@ import typing
 import tempfile
 import logging
 import logging.handlers
+import importlib
+
 root_logger = logging.getLogger("polygoniq")
 logger = logging.getLogger(f"polygoniq.{__name__}")
 if not getattr(root_logger, "polygoniq_initialized", False):
     root_logger_formatter = logging.Formatter(
-        "P%(process)d:%(asctime)s:%(name)s:%(levelname)s: [%(filename)s:%(lineno)d] %(message)s", "%H:%M:%S")
+        "P%(process)d:%(asctime)s:%(name)s:%(levelname)s: [%(filename)s:%(lineno)d] %(message)s",
+        "%H:%M:%S",
+    )
     try:
         root_logger.setLevel(int(os.environ.get("POLYGONIQ_LOG_LEVEL", "20")))
     except (ValueError, TypeError):
@@ -49,33 +53,63 @@ if not getattr(root_logger, "polygoniq_initialized", False):
             when="h",
             interval=1,
             backupCount=2,
-            utc=True
+            utc=True,
         )
         root_logger_handler.setFormatter(root_logger_formatter)
         root_logger.addHandler(root_logger_handler)
     except:
         logger.exception(
             f"Can't create rotating log handler for polygoniq root logger "
-            f"in module \"{__name__}\", file \"{__file__}\"")
+            f"in module \"{__name__}\", file \"{__file__}\""
+        )
     setattr(root_logger, "polygoniq_initialized", True)
     logger.info(
-        f"polygoniq root logger initialized in module \"{__name__}\", file \"{__file__}\" -----")
+        f"polygoniq root logger initialized in module \"{__name__}\", file \"{__file__}\" -----"
+    )
 
 
+# To comply with extension encapsulation, after the addon initialization:
+# - sys.path needs to stay the same as before the initialization
+# - global namespace can not contain any additional modules outside of __package__
+
+# Dependencies for all 'production' addons are shipped in folder `./python_deps`
+# So we do the following:
+# - Add `./python_deps` to sys.path
+# - Import all dependencies to global namespace
+# - Manually remap the dependencies from global namespace in sys.modules to a subpackage of __package__
+# - Clear global namespace of remapped dependencies
+# - Remove `./python_deps` from sys.path
+# - For developer experience, import "real" dependencies again, only if TYPE_CHECKING is True
+
+# See https://docs.blender.org/manual/en/4.2/extensions/addons.html#extensions-and-namespace
+# for more details
 ADDITIONAL_DEPS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "python_deps"))
 try:
     if os.path.isdir(ADDITIONAL_DEPS_DIR) and ADDITIONAL_DEPS_DIR not in sys.path:
         sys.path.insert(0, ADDITIONAL_DEPS_DIR)
 
+    dependencies = {
+        "polib",
+        "hatchery",  # hatchery is a transitive dependency from polib, but we still need to move it
+    }
+    for dependency in dependencies:
+        logger.debug(f"Importing additional dependency {dependency}")
+        dependency_module = importlib.import_module(dependency)
+        local_module_name = f"{__package__}.{dependency}"
+        sys.modules[local_module_name] = dependency_module
     for module_name in list(sys.modules.keys()):
-        # delete the already loaded polib module from python module cache to make sure we load
-        # the right one from scratch. this prevents the dreaded "polib-issue"
-        if module_name.startswith("polib"):
+        if module_name.startswith(tuple(dependencies)):
             del sys.modules[module_name]
 
-    import polib
+    from . import polib
+    from . import hatchery
+
     from . import preferences
     from . import cat_drawer
+
+    if typing.TYPE_CHECKING:
+        import polib
+        import hatchery
 
 finally:
     if ADDITIONAL_DEPS_DIR in sys.path:
@@ -85,7 +119,7 @@ finally:
 bl_info = {
     "name": "blenderkitty",
     "author": "polygoniq xyz s.r.o.",
-    "version": (2, 0, 0),
+    "version": (2, 0, 1),
     "blender": (3, 3, 0),
     "location": "View3D > Sidebar > Item Tab",
     "description": "Cheers you up!",
@@ -111,7 +145,7 @@ class BlenderKittyPanel(bpy.types.Panel):
     def draw_header(self, context: bpy.types.Context):
         self.layout.template_icon(
             icon_value=preferences.icon_manager.get_polygoniq_addon_icon_id("blenderkitty"),
-            scale=1.0
+            scale=1.0,
         )
 
     @staticmethod
@@ -122,7 +156,7 @@ class BlenderKittyPanel(bpy.types.Panel):
             text=text,
             icon='TRIA_DOWN' if getattr(data, attribute) else 'TRIA_RIGHT',
             icon_only=True,
-            expand=True
+            expand=True,
         )
 
     def draw(self, context: bpy.types.Context):
@@ -138,11 +172,14 @@ class BlenderKittyPanel(bpy.types.Panel):
         col = col.box().column(align=True)
         col.scale_y = 2.0
         col.operator(
-            cat_drawer.OpenCatDrawer.bl_idname, text=cat_drawer.OpenCatDrawer.get_state(0)).index = 0
+            cat_drawer.OpenCatDrawer.bl_idname, text=cat_drawer.OpenCatDrawer.get_state(0)
+        ).index = 0
         col.operator(
-            cat_drawer.OpenCatDrawer.bl_idname, text=cat_drawer.OpenCatDrawer.get_state(1)).index = 1
+            cat_drawer.OpenCatDrawer.bl_idname, text=cat_drawer.OpenCatDrawer.get_state(1)
+        ).index = 1
         col.operator(
-            cat_drawer.OpenCatDrawer.bl_idname, text=cat_drawer.OpenCatDrawer.get_state(2)).index = 2
+            cat_drawer.OpenCatDrawer.bl_idname, text=cat_drawer.OpenCatDrawer.get_state(2)
+        ).index = 2
 
         row = self.layout.row()
         row.template_icon_view(prefs, "cat", scale=8.0, scale_popup=6.0)
@@ -194,7 +231,9 @@ def blenderkitty_tick_wrapper() -> float:
 
 
 def register():
-    addon_updater_ops.register(bl_info)
+    # We pass mock "bl_info" to the updater, since Blender 4.2.0 the "bl_info" is no longer
+    # available in this scope.
+    addon_updater_ops.register({"version": (2, 0, 1)})
 
     preferences.register()
     cat_drawer.register()
@@ -202,11 +241,7 @@ def register():
     for cls in ADDON_CLASSES:
         bpy.utils.register_class(cls)
 
-    bpy.app.timers.register(
-        blenderkitty_tick_wrapper,
-        first_interval=10.0,
-        persistent=True
-    )
+    bpy.app.timers.register(blenderkitty_tick_wrapper, first_interval=10.0, persistent=True)
 
 
 def unregister():
@@ -219,7 +254,7 @@ def unregister():
     # Remove all nested modules from module cache, more reliable than importlib.reload(..)
     # Idea by BD3D / Jacques Lucke
     for module_name in list(sys.modules.keys()):
-        if module_name.startswith(__name__):
+        if module_name.startswith(__package__):
             del sys.modules[module_name]
 
     if bpy.app.timers.is_registered(blenderkitty_tick_wrapper):

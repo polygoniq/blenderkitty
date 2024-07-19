@@ -6,57 +6,28 @@ import bmesh
 import rna_prop_ui
 
 
-def create_instanced_object(collection_name: str) -> bpy.types.Object:
-    """Creates empty and sets the instance collection to one with 'collection_name'.
-
-    This is similar behaviour to bpy.ops.collection_instance_add(collection=collection_name),
-    but it is faster, because it doesn't include bpy.ops overhead. Collection 'collection_name'
-    has to exist in bpy.data.collections before call of this function.
-    """
-
-    assert collection_name in bpy.data.collections
-    collection = bpy.data.collections[collection_name]
-    instance_obj = bpy.data.objects.new(collection_name, None)
-    instance_obj.instance_type = 'COLLECTION'
-    instance_obj.instance_collection = collection
-    return instance_obj
-
-
 def copy_custom_prop(src: bpy.types.ID, dst: bpy.types.ID, prop_name: str) -> None:
     """Copies custom property 'prop_name' from 'src' to 'dst' while preserving its settings"""
-    # Blender introduced new behaviour of custom properties post 3.0.0
-    if bpy.app.version >= (3, 0, 0):
-        # In order to copy the property with its configuration (min, max, subtype, etc)
-        # we need to use following code. Code is taken from the "Copy Attributes" addon that's
-        # shipped within Blender.
+    # In order to copy the property with its configuration (min, max, subtype, etc)
+    # we need to use following code. Code is taken from the "Copy Attributes" addon that's
+    # shipped within Blender.
 
-        # Create the property.
-        dst[prop_name] = src[prop_name]
-        # Copy the settings of the property.
-        try:
-            dst_prop_manager = dst.id_properties_ui(prop_name)
-        except TypeError:
-            # Python values like lists or dictionaries don't have any settings to copy.
-            # They just consist of a value and nothing else.
-            # Note: This also skips copying the properties that cannot be edited by
-            # id_properties_ui
-            return
+    # Create the property.
+    dst[prop_name] = src[prop_name]
+    # Copy the settings of the property.
+    try:
+        dst_prop_manager = dst.id_properties_ui(prop_name)
+    except TypeError:
+        # Python values like lists or dictionaries don't have any settings to copy.
+        # They just consist of a value and nothing else.
+        # Note: This also skips copying the properties that cannot be edited by
+        # id_properties_ui
+        return
 
-        src_prop_manager = src.id_properties_ui(prop_name)
-        assert src_prop_manager, f"Property '{prop_name}' not found in {src}"
+    src_prop_manager = src.id_properties_ui(prop_name)
+    assert src_prop_manager, f"Property '{prop_name}' not found in {src}"
 
-        dst_prop_manager.update_from(src_prop_manager)
-    else:
-        # Don't ever copy _RNA_UI
-        if prop_name == "_RNA_UI":
-            return
-
-        src_prop_ui = rna_prop_ui.rna_idprop_ui_prop_get(src, prop_name)
-        dst[prop_name] = src[prop_name]
-        dst_prop_ui = rna_prop_ui.rna_idprop_ui_prop_get(dst, prop_name)
-
-        for k in src_prop_ui.keys():
-            dst_prop_ui[k] = src_prop_ui[k]
+    dst_prop_manager.update_from(src_prop_manager)
 
     # Copy the Library Overridable flag, which is stored elsewhere, sometimes it's not possible
     # to copy the library override
@@ -69,10 +40,7 @@ def copy_custom_prop(src: bpy.types.ID, dst: bpy.types.ID, prop_name: str) -> No
 
 
 def copy_custom_props(
-    src: bpy.types.ID,
-    dst: bpy.types.ID,
-    only_existing: bool = False,
-    recursive: bool = False
+    src: bpy.types.ID, dst: bpy.types.ID, only_existing: bool = False, recursive: bool = False
 ) -> None:
     """Copies all custom properties from 'src' to 'dst'
 
@@ -93,7 +61,9 @@ def copy_custom_props(
         copy_custom_prop(src, dst, prop_name)
 
 
-def ensure_particle_naming_consistency(modifier: bpy.types.ParticleSystemModifier, particle_system: bpy.types.ParticleSystem) -> None:
+def ensure_particle_naming_consistency(
+    modifier: bpy.types.ParticleSystemModifier, particle_system: bpy.types.ParticleSystem
+) -> None:
     """
     Particle data gets duplicated and has the object duplicate suffix on copy, but modifiers and particle system names do not.
     This function ensures the same naming on the whole particle system -> modifier, data, particle system, instance_collection
@@ -104,21 +74,20 @@ def ensure_particle_naming_consistency(modifier: bpy.types.ParticleSystemModifie
     """
     if modifier is None or particle_system is None:
         raise RuntimeError(
-            "Cannot ensure naming consistency if modifier or particle_system is None!")
+            "Cannot ensure naming consistency if modifier or particle_system is None!"
+        )
 
     ps_settings = particle_system.settings
     if ps_settings is None or ps_settings.instance_collection is None:
         raise RuntimeError(
-            f"Cannot ensure naming consistency if particle_system ({particle_system.name}) has no settings or no instance_collection!")
+            f"Cannot ensure naming consistency if particle_system ({particle_system.name}) has no settings or no instance_collection!"
+        )
 
     modifier.name = particle_system.name = ps_settings.name = ps_settings.instance_collection.name
 
 
 def get_area_based_particle_count(
-    obj: bpy.types.Object,
-    density: float,
-    max_particle_count: int,
-    include_weights: bool = False
+    obj: bpy.types.Object, density: float, max_particle_count: int, include_weights: bool = False
 ) -> typing.Tuple[int, int]:
     mesh_area = calculate_mesh_area(obj, include_weights)
     particle_count = int(mesh_area * density)
@@ -170,5 +139,12 @@ def can_have_materials_assigned(obj: bpy.types.Object) -> bool:
 
     # In theory checking the availability of material_slots is not necessary, all these
     # object types should have it. We check for it to avoid exceptions and errors in our code.
-    return obj.type in {'MESH', 'CURVE', 'SURFACE', 'META', 'FONT', 'GPENCIL', 'VOLUME'} \
-        and hasattr(obj, "material_slots")
+    return obj.type in {
+        'MESH',
+        'CURVE',
+        'SURFACE',
+        'META',
+        'FONT',
+        'GPENCIL',
+        'VOLUME',
+    } and hasattr(obj, "material_slots")
